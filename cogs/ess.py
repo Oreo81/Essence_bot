@@ -8,8 +8,7 @@ import os
 from datetime import datetime
 import requests
 import json
-from html2image import Html2Image
-import folium
+
 #-----------------
 def main_(ess,lat,lon,dis):
     distance = int(dis)*1000
@@ -90,6 +89,10 @@ def check_date(main_tab,now):
             return ":arrow_forward: **Deux jours**"
         elif int(now_splt[2]) - int(date_in_tab_split[2]) == 3:
             return ":arrow_forward: **Trois jours**"
+        elif int(now_splt[2]) - int(date_in_tab_split[2]) == 7:
+            return ":arrow_forward: **Une semaine**"    
+        elif int(now_splt[2]) - int(date_in_tab_split[2]) == 14:
+            return ":arrow_forward: **Deux semaines**"      
         else:           
             return ":x: **Plus de trois jours, le carburant n'est sûrement plus en stock**"
 
@@ -97,7 +100,7 @@ def adresse_to_locate(adresse):
     city = requests.get('https://api-adresse.data.gouv.fr/search/?q={}&limit=1'.format(adresse))
     recup = json.loads(city.text)
     return recup.get('features')[0].get('geometry').get('coordinates')
-    
+
 
 #-------------------------------------------
 class Com(commands.Cog):
@@ -107,7 +110,7 @@ class Com(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print('Cog Command Ready!')
-     
+
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.errors.MissingRequiredArgument):
@@ -126,25 +129,10 @@ class Com(commands.Cog):
 
         coo = adresse_to_locate(adresse)
 
-        hti = Html2Image(custom_flags=['--no-sandbox','--gpu off'])
-        hti.browser_executable = "/usr/bin/google-chrome"
-
-        m = folium.Map(location=[coo[1],coo[0]], zoom_start=12, disable_3d=True)
-        folium.Marker(
-            location=[coo[1],coo[0]],
-            popup='Kumpula Campus',
-            icon=folium.Icon(color='gray', icon='ok-sign'),
-        ).add_to(m)
-        m.save('index.html')
-        with open('./index.html') as f:
-            hti.screenshot(f.read(), save_as='out.png', size=(250, 250))
-
         embed=discord.Embed(title=':wheelchair: Recherche en cours de traitement',color=0xFFFFFF,url=f'https://www.google.com/maps/search/?api=1&query={coo[1]}%2C{coo[0]}')
-        file = discord.File('./out.png', filename="out.png")
-        embed.set_thumbnail(url="attachment://out.png")
         embed.set_author(name="{} - Info".format(ctx.author.name),icon_url=ctx.author.avatar_url)
         embed.add_field(name=":pushpin: Lieu de départ: {}".format(adresse),value="Essence: {}, Distance: {}km".format(ess,dis), inline=False)
-        await ctx.send(file=file,embed=embed)
+        await ctx.send(embed=embed)
 
         if ess not in dispo:
             embed=discord.Embed(title=':x: Erreur',color=discord.Color.red())
@@ -165,28 +153,12 @@ class Com(commands.Cog):
                         await ctx.send(embed=embed)
                     else:
                         color = [discord.Color.green(),discord.Color.orange(),discord.Color.red()]
-                        color_map = ['green','orange','red']
                         for el in tab:
-                            m = folium.Map(location=[float(el[3])/100000,float(el[4])/100000], zoom_start=16, disable_3d=True)
-                            folium.Marker(
-                                location=[float(el[3])/100000,float(el[4])/100000],
-                                popup='Kumpula Campus',
-                                icon=folium.Icon(color=color_map[tab.index(el)], icon='ok-sign'),
-                            ).add_to(m)
-                            m.save('index.html')
-                            with open('./index.html') as f:
-                                hti.screenshot(f.read(), save_as='out.png', size=(500, 500))
-
                             output = (("Pompe {}: Essence {}= {}€/L".format(tab.index(el)+1,el[2].get('nom'),el[2].get('valeur'))),("{} {}".format(el[0],el[1])),(check_date(el,now)))
                             embed=discord.Embed(title=output[0],color=color[tab.index(el)],url='https://www.google.com/maps/search/?api=1&query={}%2C{}'.format(float(el[3])/100000,float(el[4])/100000))
-                            file = discord.File('./out.png', filename="out.png")
-                            embed.set_thumbnail(url="attachment://out.png")
                             embed.add_field(name="Adresse:", value=output[1], inline=False)
                             embed.add_field(name="Date d'actualisation:", value=output[2], inline=False)
-
-
-                            await ctx.send(file=file,embed=embed)
-                        
+                            await ctx.send(embed=embed)
                 else:
                     embed=discord.Embed(title=':x: Erreur',color=discord.Color.red())
                     embed.set_author(name="{} - Help --> e!?".format(ctx.author.name),icon_url=ctx.author.avatar_url)
@@ -201,7 +173,7 @@ class Com(commands.Cog):
                 embed.add_field(name="Comamnde:", value='e!prix (essence) (distance en KM) (adresse)')
                 embed.add_field(name="Essence disponible:", value='SP95 / Gazole / E10 / E85 / GPLc')
                 await ctx.send(embed=embed)
-    
+
 
 #================================================================================
 def setup(bot):
